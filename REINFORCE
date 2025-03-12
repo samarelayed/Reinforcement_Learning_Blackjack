@@ -3,4 +3,90 @@ import gymnasium as gym
 from collections import deque
 env = gym.make("Pendulum-v1")
 
+learning_rate = 0.001
+gamma = 1.0
+
+# Hyperparametres
+learning_rate = 0.0001
+gamma = 0.99
+sigma = 0.5  # Standard deviation for the action distribution
+max_steps = 200
+
+np.random.seed(0)
+theta = np.random.randn(env.observation_space.shape[0])
+
+# Politique (distribution normale car l'espace des actions est continu)
+def policy(state, theta):
+    return np.dot(state, theta)
+
+def choose_action(state, theta):
+    mean_action = policy(state, theta)
+    action = np.random.normal(mean_action, sigma)
+    return np.clip(action, env.action_space.low[0], env.action_space.high[0])
+
+# discounted returns
+def compute_returns(rewards):
+    returns = np.zeros_like(rewards, dtype=float)
+    G = 0
+    for t in reversed(range(len(rewards))):
+        G = rewards[t] + gamma * G
+        returns[t] = G
+    return returns
+
+# REINFORCE
+def reinforce(env, theta, learning_rate, gamma, sigma, num_episodes=1000):
+    cumulative_rewards = []
+
+    for episode in range(num_episodes):
+        state = env.reset()[0]
+        states, actions, rewards = deque(), deque(), deque()
+
+        # Generation d'un épisode complet
+        truncated = False
+        for step in range(max_steps):
+            action = choose_action(state, theta)
+            next_state, reward, _, truncated, _ = env.step([action])
+
+            states.append(state)
+            actions.append(action)
+            rewards.append(reward)
+
+            state = next_state
+
+            if truncated:
+                break
+
+        returns = compute_returns(np.array(rewards))
+
+        # descente de gradient
+        for t in range(len(states)):
+            state = states[t]
+            action = actions[t]
+            G = returns[t]
+
+            mean_action = policy(state, theta)
+            grad_log_policy = (action - mean_action) / (sigma ** 2) * state
+
+            grad_update = learning_rate * gamma ** t * G * grad_log_policy
+            theta += np.clip(grad_update, -1, 1) 
+
+        cumulative_rewards.append(sum(rewards))
+
+    return theta, cumulative_rewards
+
+
+
+optimal_theta, cumulative_rewards = reinforce(env, theta, learning_rate, gamma, sigma)
+print(optimal_theta)
+
+# Affichage 
+plt.figure(figsize=(10, 6))
+plt.plot(cumulative_rewards, label='Cumulative Reward')
+plt.xlabel('Episode')
+plt.ylabel('Cumulative Reward')
+plt.title('Evolution of Cumulative Reward over Training Episodes')
+plt.legend()
+plt.grid(True)
+plt.show()
+
 
