@@ -1,1 +1,1 @@
-# Reinforcement_Learning_Blackjack
+# Reinforcement_Learning_Blackjack_and_Pendulum
